@@ -99,6 +99,24 @@
     return DAYS[d.getDay()] + ' ' + d.getDate() + ' ' + MONTHS[d.getMonth()];
   }
 
+  function fmtDateFull(d) {
+    if (!d) return '';
+    return DAYS[d.getDay()] + ' ' + d.getDate() + ' ' + MONTHS[d.getMonth()] + ' ' + d.getFullYear();
+  }
+
+  // Human-readable note explaining a suspected spreadsheet date typo.
+  // If we auto-corrected it (date moved), say what it became; if we left it
+  // as-is (couldn't confidently fix), just warn that it looks wrong.
+  function suspectNote(f) {
+    var orig = fmtDateFull(f.suspectOriginal);
+    var corrected = f.date && f.suspectOriginal && f.date.getTime() !== f.suspectOriginal.getTime();
+    if (corrected) {
+      return 'The spreadsheet shows ' + orig + ', which looks like a typo — shown here as ' +
+        fmtDateFull(f.date) + '. Please double-check.';
+    }
+    return 'The spreadsheet date (' + orig + ') looks like it may be wrong. Please double-check with the club.';
+  }
+
   function startOfToday() {
     var n = new Date();
     return new Date(n.getFullYear(), n.getMonth(), n.getDate());
@@ -294,7 +312,9 @@
               '<span class="gm-venue">📍 ' + escapeHtml(venue) + '</span>' +
               (f.round ? '<span class="gm-round">Round ' + escapeHtml(f.round) + '</span>' : '') +
               (showTeamTag ? '<span class="gm-team">' + escapeHtml(FuryFixtures.teamLabel(g.team)) + '</span>' : '') +
+              (f.dateSuspect ? '<span class="gm-warn" title="' + escapeHtml(suspectNote(f)) + '">⚠️ Check date</span>' : '') +
             '</p>' +
+            (f.dateSuspect ? '<p class="game-warn">⚠️ ' + escapeHtml(suspectNote(f)) + '</p>' : '') +
             '<div class="game-actions">' +
               (canCal
                 ? '<button class="cal-btn" data-cal="' + i + '"><svg viewBox="0 0 24 24" class="btn-icon" aria-hidden="true"><path d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"/></svg> Add to calendar</button>'

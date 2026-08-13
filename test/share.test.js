@@ -53,6 +53,20 @@ test('serialize -> deserialize round-trips the model', () => {
   assert.equal(round.teams[1].fixtures[0].isHome, true);
 });
 
+test('serialize -> deserialize preserves a suspected-date flag + original', () => {
+  const m = makeModel();
+  m.teams[0].fixtures[0].dateSuspect = true;
+  m.teams[0].fixtures[0].suspectOriginal = new Date(2026, 0, 17);
+  const round = S.deserialize(S.serialize(m));
+  const f = round.teams[0].fixtures[0];
+  assert.equal(f.dateSuspect, true);
+  assert.ok(f.suspectOriginal instanceof Date);
+  assert.equal(f.suspectOriginal.getFullYear(), 2026);
+  // Un-flagged fixtures round-trip without the flag.
+  assert.ok(!round.teams[1].fixtures[0].dateSuspect);
+  assert.equal(round.teams[1].fixtures[0].suspectOriginal, null);
+});
+
 test('serialize output is valid compact JSON with a version', () => {
   const parsed = JSON.parse(S.serialize(makeModel()));
   assert.equal(parsed.v, S.VERSION);

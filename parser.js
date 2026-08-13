@@ -152,6 +152,53 @@
     return { id: id, fixtures: fixtures };
   }
 
+  // Basketball seasons straddle two calendar years (autumn → spring). Months
+  // Aug–Dec belong to the season's start year; Jan–Jul belong to start year + 1.
+  // A date whose year contradicts that (a common spreadsheet typo, e.g. a
+  // January game left on the previous year) is corrected to the expected year
+  // and flagged so the app can warn the reader rather than silently hiding it.
+  var AUTUMN_START_MONTH = 7; // August (0-based)
+
+  function seasonStartYear(teams) {
+    var counts = {};
+    teams.forEach(function (t) {
+      t.fixtures.forEach(function (f) {
+        if (f.date && f.date.getMonth() >= AUTUMN_START_MONTH) {
+          var y = f.date.getFullYear();
+          counts[y] = (counts[y] || 0) + 1;
+        }
+      });
+    });
+    var ys = Object.keys(counts).sort(function (a, b) { return counts[b] - counts[a]; });
+    return ys.length ? +ys[0] : null;
+  }
+
+  function reconcileYears(teams) {
+    var startYear = seasonStartYear(teams);
+    if (startYear == null) return;
+    teams.forEach(function (t) {
+      t.fixtures.forEach(function (f) {
+        if (!f.date) return;
+        var mon = f.date.getMonth(), yr = f.date.getFullYear();
+        var expected = mon >= AUTUMN_START_MONTH ? startYear : startYear + 1;
+        if (yr === expected) return; // year fits the season — nothing to do
+
+        // The year contradicts the month for this season: flag it for a human.
+        f.dateSuspect = true;
+        f.suspectOriginal = f.date; // what the sheet said
+
+        // Only auto-correct the confident case: a spring-half game (Jan–Jul)
+        // mistakenly left on the start year — it clearly belongs a year later,
+        // so roll it forward. Any other mismatch (e.g. an autumn month with a
+        // future year, which usually means the *month* is the typo) is left
+        // exactly as the sheet has it and simply flagged, rather than guessed.
+        if (mon < AUTUMN_START_MONTH && yr === startYear) {
+          f.date = new Date(startYear + 1, mon, f.date.getDate());
+        }
+      });
+    });
+  }
+
   function deriveSeason(teams) {
     var years = {};
     teams.forEach(function (t) {
@@ -178,6 +225,7 @@
     if (!teams.length) {
       throw new Error("Couldn't find any fixtures in this spreadsheet. Expected sheets with DATE, HOME and AWAY columns.");
     }
+    reconcileYears(teams);
     return { club: CLUB, teams: teams, season: deriveSeason(teams) };
   }
 
@@ -188,6 +236,8 @@
     findHeaderRow: findHeaderRow,
     resolveSides: resolveSides,
     deriveSeason: deriveSeason,
+    seasonStartYear: seasonStartYear,
+    reconcileYears: reconcileYears,
     _helpers: { isDate: isDate, extractTime: extractTime, cellStr: cellStr, parseDate: parseDate, headerIndex: headerIndex }
   };
 });

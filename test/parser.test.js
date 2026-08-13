@@ -128,3 +128,60 @@ test('parseWorkbook: builds a multi-team model with a season', () => {
 test('deriveSeason returns "" when there are no dated fixtures', () => {
   assert.equal(parser.deriveSeason([{ id: 'X', fixtures: [{ date: null }] }]), '');
 });
+
+test('seasonStartYear picks the autumn-half year', () => {
+  const teams = [{ id: 'A', fixtures: [
+    { date: new Date(2026, 8, 5) },  // Sep 2026 (autumn)
+    { date: new Date(2026, 10, 1) }, // Nov 2026 (autumn)
+    { date: new Date(2027, 1, 1) }   // Feb 2027 (spring) — ignored for start year
+  ] }];
+  assert.equal(parser.seasonStartYear(teams), 2026);
+});
+
+test('reconcileYears flags + corrects an out-of-season year typo', () => {
+  const teams = [{ id: 'U14MD1', fixtures: [
+    { date: new Date(2026, 8, 5), round: 1 },   // Sep 2026 — fine
+    { date: new Date(2026, 11, 12), round: 8 },  // Dec 2026 — fine
+    { date: new Date(2026, 0, 17), round: 10 },  // Jan 2026 — typo, should be 2027
+    { date: new Date(2027, 1, 14), round: 12 }   // Feb 2027 — fine
+  ] }];
+  parser.reconcileYears(teams);
+  const fx = teams[0].fixtures;
+
+  // The January date is corrected to the next year and flagged.
+  assert.equal(fx[2].dateSuspect, true);
+  assert.equal(fx[2].date.getFullYear(), 2027);
+  assert.equal(fx[2].date.getMonth(), 0);
+  assert.equal(fx[2].date.getDate(), 17);
+  assert.ok(fx[2].suspectOriginal instanceof Date);
+  assert.equal(fx[2].suspectOriginal.getFullYear(), 2026);
+
+  // Correctly-dated fixtures are left untouched and unflagged.
+  assert.ok(!fx[0].dateSuspect);
+  assert.ok(!fx[1].dateSuspect);
+  assert.ok(!fx[3].dateSuspect);
+});
+
+test('reconcileYears flags but does NOT move an ambiguous (autumn) mismatch', () => {
+  // A September game dated a year late is usually a *month* typo, not a year
+  // one — so it's flagged for a human but left exactly as the sheet has it.
+  const teams = [{ id: 'U18MD1', fixtures: [
+    { date: new Date(2026, 8, 5), round: 1 },    // Sep 2026 — anchors start year
+    { date: new Date(2027, 8, 20), round: 18 }   // Sep 2027 — suspect, not auto-fixed
+  ] }];
+  parser.reconcileYears(teams);
+  const f = teams[0].fixtures[1];
+  assert.equal(f.dateSuspect, true);
+  assert.equal(f.date.getFullYear(), 2027);   // unchanged
+  assert.equal(f.date.getMonth(), 8);         // unchanged
+  assert.equal(f.suspectOriginal.getTime(), f.date.getTime()); // no correction applied
+});
+
+test('reconcileYears is a no-op when every year already fits the season', () => {
+  const teams = [{ id: 'A', fixtures: [
+    { date: new Date(2026, 8, 5) },
+    { date: new Date(2027, 2, 14) }
+  ] }];
+  parser.reconcileYears(teams);
+  assert.ok(!teams[0].fixtures.some(f => f.dateSuspect));
+});

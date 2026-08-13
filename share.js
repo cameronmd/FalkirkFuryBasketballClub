@@ -26,7 +26,9 @@
       f.round || 0,
       f.home || '',
       f.away || '',
-      f.rawTime || ''
+      f.rawTime || '',
+      f.dateSuspect ? 1 : 0,
+      (f.dateSuspect && f.suspectOriginal) ? f.suspectOriginal.getTime() : 0
     ];
   }
 
@@ -42,7 +44,9 @@
       isHome: !!a[5],
       round: a[6] || null,
       home: a[7] || '',
-      away: a[8] || ''
+      away: a[8] || '',
+      dateSuspect: !!a[10],
+      suspectOriginal: a[11] ? new Date(a[11]) : null
     };
   }
 
@@ -107,6 +111,7 @@
       var bits = [when + (time ? ' ' + time : ''), vs];
       if (g.teamLabel) bits.push('[' + g.teamLabel + ']');
       if (f.location && f.location.toUpperCase() !== 'TBC') bits.push('· ' + f.location);
+      if (f.dateSuspect) bits.push('⚠️(check date)');
       lines.push('• ' + bits.join(' '));
     });
     return lines.join('\n');

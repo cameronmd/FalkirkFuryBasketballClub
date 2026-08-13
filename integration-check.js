@@ -58,6 +58,24 @@ check('TBC fixtures are kept (null date)', tbc.length >= 1, tbc.length + ' TBC r
 const venued = model.teams.reduce((n, t) => n + t.fixtures.filter(f => f.location && f.location.toUpperCase() !== 'TBC').length, 0);
 check('>= 85% fixtures have a venue', venued / totalFixtures >= 0.85, venued + '/' + totalFixtures);
 
+// Suspicious dates are flagged. The clean pre-season typo (U14MD1 r10, Jan
+// "2026") is rolled forward to 2027; the ambiguous one (U18MD1 r18, Sep "2027")
+// is flagged but left as-is for a human to resolve.
+const suspects = [];
+model.teams.forEach(t => t.fixtures.forEach(f => {
+  if (f.dateSuspect) suspects.push(t.id + ' r' + f.round + ': ' + f.suspectOriginal.toDateString() + ' -> ' + f.date.toDateString());
+}));
+console.log('Flagged dates:\n  ' + suspects.join('\n  ') + '\n');
+const u14 = model.teams.find(t => t.id === 'U14MD1').fixtures.find(f => f.round === 10);
+check('U14MD1 r10 pre-season typo is flagged AND rolled to Jan 2027',
+  u14.dateSuspect && u14.date.getFullYear() === 2027 && u14.date.getMonth() === 0, u14.date.toDateString());
+const u18 = model.teams.find(t => t.id === 'U18MD1').fixtures.find(f => f.round === 18);
+check('U18MD1 r18 ambiguous typo is flagged but left unchanged',
+  u18.dateSuspect && u18.date.getTime() === u18.suspectOriginal.getTime(), u18.date.toDateString());
+// No fixture is left dated before the season start year.
+const strays = model.teams.reduce((n, t) => n + t.fixtures.filter(f => f.date && f.date.getFullYear() < 2026).length, 0);
+check('no fixture is left dated before the season start year', strays === 0, strays + ' strays');
+
 // Same-day detection works across teams (season openers cluster on weekends).
 const u16w = model.teams.find(t => t.id === 'U16W');
 const firstDated = u16w.fixtures.find(f => f.date);
