@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#1b1630" />
+  <title>Falkirk Fury Basketball — Fixtures</title>
+  <meta name="description" content="See Falkirk Fury basketball fixtures for your team and add them to your calendar in one tap." />
+
+  <link rel="manifest" href="manifest.webmanifest" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Fury Fixtures" />
+  <link rel="apple-touch-icon" href="icons/icon-180.png" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='46' fill='%23ef6c1a'/%3E%3Cg fill='none' stroke='%231b1630' stroke-width='4'%3E%3Ccircle cx='50' cy='50' r='46'/%3E%3Cpath d='M50 4v92M4 50h92M18 18C34 34 34 66 18 82M82 18C66 34 66 66 82 82'/%3E%3C/g%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="app-header">
+    <div class="wrap header-inner">
+      <div class="brand">
+        <span class="ball" aria-hidden="true"></span>
+        <div>
+          <h1>Falkirk Fury</h1>
+          <p class="tagline">Basketball Fixtures</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button id="settingsBtn" class="icon-btn" hidden aria-label="Calendar settings" title="Calendar settings">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M19.4 13a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V21a2 2 0 1 1-4 0v-.1A1.7 1.7 0 0 0 7 19.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0-1.2-2.9H3a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 4.7 7l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H10a1.7 1.7 0 0 0 1-1.6V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V10a1.7 1.7 0 0 0 1.6 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg>
+        </button>
+        <button id="changeFileBtn" class="ghost-btn" hidden>Change file</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <!-- Upload -->
+    <section id="uploadSection" class="card upload-card" hidden>
+      <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="Upload fixtures spreadsheet">
+        <svg class="upload-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0L7 9m5-5 5 5M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+        <p class="dz-title">Upload the fixtures spreadsheet</p>
+        <p class="dz-sub">Tap to choose the <strong>.xlsx</strong> spreadsheet, or drag it here</p>
+        <input type="file" id="fileInput" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden />
+      </div>
+      <p class="privacy-note">🔒 The spreadsheet is read entirely on your device — nothing is uploaded anywhere.</p>
+      <p id="parseError" class="error-msg" hidden></p>
+    </section>
+
+    <!-- Controls -->
+    <section id="controlsSection" class="controls" hidden>
+      <div class="control-row">
+        <label for="teamSearch" class="control-label">Team</label>
+        <div class="team-picker">
+          <input type="text" id="teamSearch" placeholder="Choose a team, or view all…" autocomplete="off" readonly />
+          <ul id="teamList" class="team-list" hidden></ul>
+        </div>
+      </div>
+      <div class="filter-chips" id="filterChips">
+        <button class="chip active" data-filter="home">Home</button>
+        <button class="chip active" data-filter="away">Away</button>
+        <button class="chip active" data-filter="hidepast">Hide past games</button>
+      </div>
+    </section>
+
+    <!-- Summary + actions -->
+    <section id="summarySection" class="summary" hidden>
+      <div class="summary-stats">
+        <div class="stat"><span id="statGames" class="stat-num">0</span><span class="stat-label">games</span></div>
+        <div class="stat next-stat" id="nextStat" hidden><span class="stat-label">Next game</span><span id="statNext" class="stat-next">—</span></div>
+      </div>
+      <div class="summary-actions">
+        <button id="shareBtn" class="ghost-btn light">
+          <svg viewBox="0 0 24 24" aria-hidden="true" class="btn-icon"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8M16 6l-4-4-4 4M12 2v14"/></svg>
+          Share
+        </button>
+        <button id="addAllBtn" class="primary-btn">
+          <svg viewBox="0 0 24 24" aria-hidden="true" class="btn-icon"><path d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"/></svg>
+          Add all to calendar
+        </button>
+      </div>
+    </section>
+
+    <!-- Games -->
+    <section id="gamesSection" class="games"></section>
+    <div id="emptyState" class="empty-state" hidden></div>
+  </main>
+
+  <footer class="app-footer wrap">
+    <p>Falkirk Fury Basketball Club fixtures · runs entirely in your browser</p>
+  </footer>
+
+  <!-- Same-day modal -->
+  <div id="modal" class="modal" hidden>
+    <div class="modal-backdrop" data-close></div>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <button class="modal-close" data-close aria-label="Close">&times;</button>
+      <h3 id="modalTitle">Game details</h3>
+      <div id="modalBody" class="modal-body"></div>
+    </div>
+  </div>
+
+  <!-- Settings modal -->
+  <div id="settingsModal" class="modal" hidden>
+    <div class="modal-backdrop" data-close></div>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+      <button class="modal-close" data-close aria-label="Close">&times;</button>
+      <h3 id="settingsTitle">Calendar settings</h3>
+      <div class="modal-body">
+        <p class="modal-sub">These apply to events you add to your calendar. Each game already uses its own venue from the fixtures — the location below is a fallback for games marked TBC.</p>
+        <form id="settingsForm" class="settings-form">
+          <label class="fld"><span>Fallback location</span>
+            <input type="text" id="setLocation" placeholder="Grangemouth Sports Complex" />
+          </label>
+          <label class="fld"><span>Game length</span>
+            <select id="setDuration">
+              <option value="60">1 hour</option>
+              <option value="90">1½ hours</option>
+              <option value="120">2 hours</option>
+              <option value="150">2½ hours</option>
+            </select>
+          </label>
+          <label class="fld"><span>Reminder</span>
+            <select id="setReminder">
+              <option value="0">No reminder</option>
+              <option value="1">1 hour before</option>
+              <option value="2">2 hours before</option>
+              <option value="3">3 hours before</option>
+              <option value="24">1 day before</option>
+            </select>
+          </label>
+          <div class="settings-actions">
+            <button type="button" class="ghost-btn dark" id="settingsReset">Reset to defaults</button>
+            <button type="submit" class="primary-btn solid">Save</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Share modal -->
+  <div id="shareModal" class="modal" hidden>
+    <div class="modal-backdrop" data-close></div>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="shareTitle">
+      <button class="modal-close" data-close aria-label="Close">&times;</button>
+      <h3 id="shareTitle">Share</h3>
+      <div class="modal-body">
+        <p class="modal-sub">Send these fixtures as a link (others open them ready to go — no spreadsheet needed), or share the fixtures on screen as text.</p>
+        <button type="button" class="wide-btn" id="shareLinkBtn">
+          🔗 <span>Copy / share fixtures link</span>
+        </button>
+        <button type="button" class="wide-btn" id="shareTextBtn">
+          📋 <span>Share these fixtures as text</span>
+        </button>
+        <p id="shareStatus" class="share-status" hidden></p>
+      </div>
+    </div>
+  </div>
+
+  <script src="vendor/xlsx.full.min.js"></script>
+  <script src="parser.js"></script>
+  <script src="fixtures.js"></script>
+  <script src="calendar.js"></script>
+  <script src="share.js"></script>
+  <script src="app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('sw.js').catch(function () { /* offline unavailable — app still works online */ });
+      });
+    }
+  </script>
+</body>
+</html>

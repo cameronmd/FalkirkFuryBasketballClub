@@ -1,0 +1,20 @@
+{
+  "name": "falkirkfurybasketballclub",
+  "version": "1.0.0",
+  "description": "Falkirk Fury basketball fixtures — pick your team, see the games, and add them to your calendar in one tap.",
+  "scripts": {
+    "test": "node --test",
+    "test:integration": "node integration-check.js",
+    "build:data": "node tools/build-data.js",
+    "start": "npx --yes http-server -p 4178 -c-1 ."
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cameronmd/FalkirkFuryBasketballClub.git"
+  },
+  "license": "MIT",
+  "type": "commonjs",
+  "devDependencies": {
+    "xlsx": "^0.18.5"
+  }
+}

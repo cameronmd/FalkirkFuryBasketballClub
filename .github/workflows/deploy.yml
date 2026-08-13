@@ -1,0 +1,67 @@
+name: CI & Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# Allow the deploy job to publish to GitHub Pages.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Only one concurrent deploy; don't cancel an in-progress run.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      # No dependencies to install — tests use Node's built-in test runner.
+      - name: Run unit tests
+        run: node --test
+
+  deploy:
+    name: Deploy to Pages
+    # Only deploy from main, and only if tests pass.
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: test
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure Pages
+        # enablement: true turns on Pages (workflow build type) on first run,
+        # so no manual repo setting is needed.
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Stage static site
+        run: |
+          mkdir -p _site
+          cp index.html styles.css parser.js fixtures.js calendar.js share.js app.js _site/
+          cp sw.js manifest.webmanifest _site/
+          cp -r vendor icons data _site/
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
