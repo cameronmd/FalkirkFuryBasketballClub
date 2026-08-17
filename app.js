@@ -284,9 +284,10 @@
     var li = document.createElement('li');
     li.className = 'all-opt' + (on ? ' sel' : '');
     li.tabIndex = 0;
+    li.setAttribute('data-all', '1');
     li.innerHTML = '<span class="ti-check">' + (on ? '●' : '') + '</span>' +
       '<span class="ti-label">👥 All teams — every fixture</span>';
-    li.addEventListener('mousedown', function (e) { e.preventDefault(); selectAllTeams(); });
+    li.addEventListener('click', selectAllTeams);
     li.addEventListener('keydown', function (e) { if (e.key === 'Enter') selectAllTeams(); });
     el.teamList.appendChild(li);
   }
@@ -296,32 +297,56 @@
     var li = document.createElement('li');
     li.className = 'team-opt' + (on ? ' sel' : '');
     li.tabIndex = 0;
+    li.setAttribute('data-team', t.id);
     li.innerHTML = '<span class="ti-check">' + (on ? '✓' : '') + '</span>' +
       '<span class="ti-label">' + escapeHtml(t.label) + '</span>' +
       '<span class="ti-sub">' + escapeHtml(t.id) + '</span>';
-    li.addEventListener('mousedown', function (e) { e.preventDefault(); toggleTeam(t.id); });
+    li.addEventListener('click', function () { toggleTeam(t.id); });
     li.addEventListener('keydown', function (e) { if (e.key === 'Enter') toggleTeam(t.id); });
     el.teamList.appendChild(li);
   }
 
   function showTeamList() {
     el.teamList.innerHTML = '';
-    var hint = document.createElement('li');
-    hint.className = 'picker-hint';
-    hint.textContent = 'Tap teams to add or remove — pick as many as you like.';
-    el.teamList.appendChild(hint);
+    var head = document.createElement('li');
+    head.className = 'picker-hint';
+    head.innerHTML = '<span>Tap teams to add or remove — pick as many as you like.</span>';
+    var done = document.createElement('button');
+    done.type = 'button';
+    done.className = 'picker-done';
+    done.textContent = 'Done';
+    done.addEventListener('click', function () { hideTeamList(); });
+    head.appendChild(done);
+    el.teamList.appendChild(head);
     addAllRow();
     FuryFixtures.teams(model()).forEach(function (t) { addTeamRow(t); });
     el.teamList.hidden = false;
   }
 
   function hideTeamList() { el.teamList.hidden = true; }
+  function toggleTeamList() { if (el.teamList.hidden) showTeamList(); else hideTeamList(); }
+
+  // Update the tick marks / highlight in place (without rebuilding the list, so
+  // an outside-click check against the clicked node stays reliable).
+  function updateListTicks() {
+    Array.prototype.forEach.call(el.teamList.children, function (li) {
+      var check = li.querySelector ? li.querySelector('.ti-check') : null;
+      if (li.getAttribute && li.getAttribute('data-all') != null) {
+        var onAll = isAll();
+        li.classList.toggle('sel', onAll);
+        if (check) check.textContent = onAll ? '●' : '';
+      } else if (li.getAttribute && li.getAttribute('data-team') != null) {
+        var onTeam = !isAll() && selectedIds().indexOf(li.getAttribute('data-team')) !== -1;
+        li.classList.toggle('sel', onTeam);
+        if (check) check.textContent = onTeam ? '✓' : '';
+      }
+    });
+  }
 
   function selectAllTeams() {
     state.selection = { mode: 'all', ids: [] };
     saveSelection();
     hideTeamList();
-    el.teamSearch.blur();
     render();
   }
 
@@ -333,9 +358,9 @@
     if (i === -1) ids.push(id); else ids.splice(i, 1);
     state.selection = ids.length ? { mode: 'teams', ids: orderIds(ids) } : { mode: 'all', ids: [] };
     saveSelection();
-    showTeamList();      // refresh ticks
+    updateListTicks();   // refresh ticks in place (list stays open)
     renderTeamPicker();  // refresh the input label
-    renderMainView();    // refresh games/summary/spotlight, leaving the list open
+    renderMainView();    // refresh games/summary/spotlight
   }
 
   function renderSummary(games) {
@@ -749,9 +774,18 @@
       el.fileInput.click();
     });
 
-    el.teamSearch.addEventListener('focus', showTeamList);
-    el.teamSearch.addEventListener('click', showTeamList);
-    el.teamSearch.addEventListener('blur', function () { setTimeout(hideTeamList, 150); });
+    // Tap the field to open/close; keyboard users can open with Enter/Space/Down.
+    el.teamSearch.addEventListener('click', toggleTeamList);
+    el.teamSearch.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowDown') { e.preventDefault(); showTeamList(); }
+      else if (e.key === 'Escape') hideTeamList();
+    });
+    // Tap anywhere outside the picker closes the dropdown.
+    document.addEventListener('click', function (e) {
+      if (el.teamList.hidden) return;
+      if (e.target === el.teamSearch || el.teamList.contains(e.target)) return;
+      hideTeamList();
+    });
 
     el.filterChips.addEventListener('click', function (e) {
       var btn = e.target.closest('.chip');
@@ -782,7 +816,7 @@
     [el.modal, el.settingsModal, el.shareModal].forEach(function (mod) {
       mod.addEventListener('click', function (e) { if (e.target.hasAttribute('data-close')) closeModals(); });
     });
-    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeModals(); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { closeModals(); hideTeamList(); } });
   }
 
   // ============================================================

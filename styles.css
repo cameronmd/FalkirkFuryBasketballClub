@@ -139,9 +139,15 @@ main.wrap { padding-top: 18px; padding-bottom: 40px; }
 .team-list li.all-opt { font-weight: 700; color: var(--orange-dark); border-bottom: 1px solid var(--line); border-radius: 8px 8px 0 0; margin-bottom: 2px; }
 .team-list li.picker-hint {
   cursor: default; font-size: .74rem; color: var(--grey); font-weight: 600;
-  padding: 4px 10px 8px; display: block;
+  padding: 4px 6px 8px; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  border-bottom: 1px solid var(--line); margin-bottom: 4px;
 }
 .team-list li.picker-hint:hover { background: none; }
+.picker-done {
+  flex: 0 0 auto; border: none; background: var(--ink); color: #fff;
+  padding: 6px 16px; border-radius: 16px; font-size: .82rem; font-weight: 700; cursor: pointer;
+}
+.picker-done:active { transform: translateY(1px); }
 .team-list li.sel { background: #fbeee3; }
 .team-list li.sel:hover { background: #f7e4d4; }
 .ti-check { flex: 0 0 16px; width: 16px; text-align: center; color: var(--orange-dark); font-weight: 800; font-size: .9rem; }
