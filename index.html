@@ -51,9 +51,9 @@
     <!-- Controls -->
     <section id="controlsSection" class="controls" hidden>
       <div class="control-row">
-        <label for="teamSearch" class="control-label">Team</label>
+        <label for="teamSearch" class="control-label">Teams</label>
         <div class="team-picker">
-          <input type="text" id="teamSearch" placeholder="Choose a team, or view all…" autocomplete="off" readonly />
+          <input type="text" id="teamSearch" placeholder="Choose team(s), or view all…" aria-label="Choose teams" autocomplete="off" readonly />
           <ul id="teamList" class="team-list" hidden></ul>
         </div>
       </div>
@@ -81,6 +81,9 @@
         </button>
       </div>
     </section>
+
+    <!-- This-weekend spotlight -->
+    <section id="spotlightSection" class="spotlight" hidden></section>
 
     <!-- Games -->
     <section id="gamesSection" class="games"></section>

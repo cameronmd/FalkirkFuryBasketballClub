@@ -25,11 +25,12 @@
   }
 
   // ---------- State ----------
+  // selection.mode is 'all' (every team) or 'teams' (selection.ids — one or more).
   var state = {
     club: 'Falkirk Fury',
     season: '',
     teams: [],      // [{ id, fixtures: [...] }]
-    selectedTeam: null,
+    selection: { mode: 'all', ids: [] },
     filters: { home: true, away: true, hidepast: true },
     meta: { fileName: '' },
     settings: cloneSettings(CAL_DEFAULTS)
@@ -37,8 +38,21 @@
 
   function model() { return { club: state.club, season: state.season, teams: state.teams }; }
   function hasData() { return state.teams.length > 0; }
-  function isAll() { return state.selectedTeam === ALL_TEAMS; }
-  function headingLabel() { return isAll() ? 'All teams' : (FuryFixtures.teamLabel(state.selectedTeam) || 'Fixtures'); }
+  function isAll() { return state.selection.mode === 'all'; }
+  function selectedIds() { return state.selection.ids || []; }
+  function isMulti() { return !isAll() && selectedIds().length > 1; }
+  function headingLabel() {
+    if (isAll()) return 'All teams';
+    var ids = selectedIds();
+    if (ids.length === 1) return FuryFixtures.teamLabel(ids[0]) || 'Fixtures';
+    if (ids.length > 1) return ids.length + ' teams';
+    return 'Fixtures';
+  }
+  // Keep selected ids in the workbook's team order for a stable display.
+  function orderIds(ids) {
+    var order = state.teams.map(function (t) { return t.id; });
+    return ids.slice().sort(function (a, b) { return order.indexOf(a) - order.indexOf(b); });
+  }
   function slug(s) {
     return (String(s || 'fixtures').replace(/\W+/g, '-').toLowerCase().replace(/^-+|-+$/g, '')) || 'fixtures';
   }
@@ -57,6 +71,7 @@
     teamList: $('teamList'),
     filterChips: $('filterChips'),
     summarySection: $('summarySection'),
+    spotlightSection: $('spotlightSection'),
     statGames: $('statGames'),
     nextStat: $('nextStat'),
     statNext: $('statNext'),
@@ -133,8 +148,9 @@
   // ============================================================
 
   function currentGames() {
-    if (isAll()) return FuryFixtures.allFixtureGames(model(), state.filters, startOfToday());
-    return FuryFixtures.teamGames(model(), state.selectedTeam, state.filters, startOfToday());
+    var today = startOfToday();
+    if (isAll()) return FuryFixtures.allFixtureGames(model(), state.filters, today);
+    return FuryFixtures.teamsGames(model(), selectedIds(), state.filters, today);
   }
 
   function matesFor(fixture) {
@@ -182,10 +198,33 @@
     state.season = mdl.season || '';
     state.teams = mdl.teams || [];
     state.meta = meta || {};
-    if (state.selectedTeam && !isAll() && !FuryFixtures.findTeam(model(), state.selectedTeam)) {
-      state.selectedTeam = null;
-    }
-    if (!state.selectedTeam) state.selectedTeam = defaultSelection();
+    reconcileSelection();
+  }
+
+  // Drop any selected ids that no longer exist; fall back to "all" if empty.
+  function reconcileSelection() {
+    if (state.selection.mode !== 'teams') return;
+    var ids = selectedIds().filter(function (id) { return FuryFixtures.findTeam(model(), id); });
+    state.selection = ids.length ? { mode: 'teams', ids: orderIds(ids) } : { mode: 'all', ids: [] };
+  }
+
+  function saveSelection() {
+    try { localStorage.setItem(TEAM_KEY, JSON.stringify(state.selection)); } catch (e) {}
+  }
+
+  // Read the remembered selection, tolerating the older single-id / sentinel format.
+  function loadSelection() {
+    try {
+      var raw = localStorage.getItem(TEAM_KEY);
+      if (!raw) return { mode: 'all', ids: [] };
+      if (raw === ALL_TEAMS || raw === 'all') return { mode: 'all', ids: [] };
+      if (raw.charAt(0) === '{') {
+        var o = JSON.parse(raw);
+        if (o && o.mode === 'teams' && o.ids && o.ids.length) return { mode: 'teams', ids: o.ids.slice() };
+        return { mode: 'all', ids: [] };
+      }
+      return { mode: 'teams', ids: [raw] }; // legacy single-team id
+    } catch (e) { return { mode: 'all', ids: [] }; }
   }
 
   function load() {
@@ -206,56 +245,97 @@
     el.changeFileBtn.hidden = !hasData();
     el.settingsBtn.hidden = !hasData();
     el.controlsSection.hidden = !hasData();
-    if (!hasData()) { el.summarySection.hidden = true; el.gamesSection.innerHTML = ''; return; }
-
-    renderTeamPicker();
-
-    if (!state.selectedTeam) {
+    if (!hasData()) {
       el.summarySection.hidden = true;
+      el.spotlightSection.hidden = true;
       el.gamesSection.innerHTML = '';
-      el.emptyState.hidden = false;
-      el.emptyState.textContent = 'Choose a team above, or view all teams, to see fixtures.';
       return;
     }
+    renderTeamPicker();
+    renderMainView();
+  }
 
+  // Everything below the picker — refreshed on filter/selection changes without
+  // touching (or closing) the team dropdown.
+  function renderMainView() {
     var games = currentGames();
     el.summarySection.hidden = false;
     renderSummary(games);
+    renderSpotlight(games);
     renderGames(games);
   }
 
   function renderTeamPicker() {
-    if (isAll()) el.teamSearch.value = 'All teams — every fixture';
-    else if (state.selectedTeam) el.teamSearch.value = FuryFixtures.teamLabel(state.selectedTeam) + '  ·  ' + state.selectedTeam;
-    else el.teamSearch.value = '';
+    if (isAll()) {
+      el.teamSearch.value = 'All teams — every fixture';
+      return;
+    }
+    var ids = selectedIds();
+    if (ids.length === 1) {
+      el.teamSearch.value = FuryFixtures.teamLabel(ids[0]) + '  ·  ' + ids[0];
+    } else {
+      var labels = ids.map(function (id) { return FuryFixtures.teamLabel(id); });
+      el.teamSearch.value = labels.length <= 2 ? labels.join(', ') : (labels[0] + ' + ' + (labels.length - 1) + ' more');
+    }
   }
 
-  function addTeamItem(label, sub, value, cls) {
+  function addAllRow() {
+    var on = isAll();
     var li = document.createElement('li');
-    if (cls) li.className = cls;
+    li.className = 'all-opt' + (on ? ' sel' : '');
     li.tabIndex = 0;
-    li.innerHTML = '<span class="ti-label">' + escapeHtml(label) + '</span>' +
-      (sub ? '<span class="ti-sub">' + escapeHtml(sub) + '</span>' : '');
-    li.addEventListener('mousedown', function (e) { e.preventDefault(); selectTeam(value); });
-    li.addEventListener('keydown', function (e) { if (e.key === 'Enter') selectTeam(value); });
+    li.innerHTML = '<span class="ti-check">' + (on ? '●' : '') + '</span>' +
+      '<span class="ti-label">👥 All teams — every fixture</span>';
+    li.addEventListener('mousedown', function (e) { e.preventDefault(); selectAllTeams(); });
+    li.addEventListener('keydown', function (e) { if (e.key === 'Enter') selectAllTeams(); });
+    el.teamList.appendChild(li);
+  }
+
+  function addTeamRow(t) {
+    var on = !isAll() && selectedIds().indexOf(t.id) !== -1;
+    var li = document.createElement('li');
+    li.className = 'team-opt' + (on ? ' sel' : '');
+    li.tabIndex = 0;
+    li.innerHTML = '<span class="ti-check">' + (on ? '✓' : '') + '</span>' +
+      '<span class="ti-label">' + escapeHtml(t.label) + '</span>' +
+      '<span class="ti-sub">' + escapeHtml(t.id) + '</span>';
+    li.addEventListener('mousedown', function (e) { e.preventDefault(); toggleTeam(t.id); });
+    li.addEventListener('keydown', function (e) { if (e.key === 'Enter') toggleTeam(t.id); });
     el.teamList.appendChild(li);
   }
 
   function showTeamList() {
     el.teamList.innerHTML = '';
-    addTeamItem('👥 All teams — every fixture', '', ALL_TEAMS, 'all-opt');
-    FuryFixtures.teams(model()).forEach(function (t) { addTeamItem(t.label, t.id, t.id, null); });
+    var hint = document.createElement('li');
+    hint.className = 'picker-hint';
+    hint.textContent = 'Tap teams to add or remove — pick as many as you like.';
+    el.teamList.appendChild(hint);
+    addAllRow();
+    FuryFixtures.teams(model()).forEach(function (t) { addTeamRow(t); });
     el.teamList.hidden = false;
   }
 
   function hideTeamList() { el.teamList.hidden = true; }
 
-  function selectTeam(value) {
-    state.selectedTeam = value;
-    try { localStorage.setItem(TEAM_KEY, value); } catch (e) {}
+  function selectAllTeams() {
+    state.selection = { mode: 'all', ids: [] };
+    saveSelection();
     hideTeamList();
     el.teamSearch.blur();
     render();
+  }
+
+  // Toggle a team in/out of the selection, keeping the dropdown open for
+  // multi-picking. Clearing the last team falls back to "all teams".
+  function toggleTeam(id) {
+    var ids = isAll() ? [] : selectedIds().slice();
+    var i = ids.indexOf(id);
+    if (i === -1) ids.push(id); else ids.splice(i, 1);
+    state.selection = ids.length ? { mode: 'teams', ids: orderIds(ids) } : { mode: 'all', ids: [] };
+    saveSelection();
+    showTeamList();      // refresh ticks
+    renderTeamPicker();  // refresh the input label
+    renderMainView();    // refresh games/summary/spotlight, leaving the list open
   }
 
   function renderSummary(games) {
@@ -273,6 +353,51 @@
     el.addAllBtn.childNodes[el.addAllBtn.childNodes.length - 1].nodeValue = ' Add ' + exportable + ' to calendar';
   }
 
+  // The upcoming weekend (Sat + Sun) relative to today.
+  function weekendWindow(today) {
+    var dow = today.getDay(); // 0 Sun … 6 Sat
+    var sat = new Date(today), sun = new Date(today);
+    if (dow === 0) {          // Sunday — this weekend is yesterday (Sat) + today
+      sat.setDate(today.getDate() - 1);
+    } else {                  // Mon–Sat — the coming Saturday + Sunday
+      sat.setDate(today.getDate() + (6 - dow));
+      sun = new Date(sat); sun.setDate(sat.getDate() + 1);
+    }
+    return { start: sat, end: sun };
+  }
+
+  // #5 — a compact "this weekend" spotlight above the list (all-teams / multi
+  // views, where it aggregates across teams). Respects the active filters.
+  function renderSpotlight(games) {
+    if (!(isAll() || isMulti())) { el.spotlightSection.hidden = true; return; }
+    var today = startOfToday();
+    var w = weekendWindow(today);
+    var wk = games.filter(function (g) {
+      var d = g.fixture.date;
+      return d && d >= today && d >= w.start && d <= w.end;
+    });
+    if (!wk.length) { el.spotlightSection.hidden = true; return; }
+
+    el.spotlightSection.hidden = false;
+    el.spotlightSection.innerHTML =
+      '<div class="spot-head">🔥 This weekend <span>' + escapeHtml(fmtDate(w.start)) + ' – ' + escapeHtml(fmtDate(w.end)) + '</span></div>' +
+      '<ul class="spot-list">' + wk.map(function (g) {
+        var f = g.fixture;
+        var venue = (f.location && f.location.toUpperCase() !== 'TBC') ? f.location : 'Venue TBC';
+        return '<li class="spot-item status-' + g.info.status + '">' +
+          '<span class="spot-when">' + (f.date ? DAYS[f.date.getDay()] : '') + ' ' + (f.time ? fmtTime(f.time) : 'TBC') + '</span>' +
+          '<span class="spot-body">' +
+            '<span class="spot-team">' + escapeHtml(FuryFixtures.teamLabel(g.team)) + '</span> ' +
+            '<span class="spot-match">' + (f.isHome ? 'vs ' : '@ ') + escapeHtml(f.opponent || 'TBC') + '</span>' +
+            '<span class="spot-venue">📍 ' + escapeHtml(venue) + '</span>' +
+          '</span>' +
+        '</li>';
+      }).join('') + '</ul>';
+  }
+
+  function monthKey(d) { return d ? d.getFullYear() + '-' + d.getMonth() : 'tbc'; }
+  function monthLabel(d) { return d ? MONTHS[d.getMonth()] + ' ' + d.getFullYear() : 'Date TBC'; }
+
   function statusBadge(info) {
     return '<span class="badge badge-' + info.status + '">' + escapeHtml(info.label) + '</span>';
   }
@@ -285,15 +410,20 @@
       return;
     }
     el.emptyState.hidden = true;
-    var showTeamTag = isAll();
+    var showTeamTag = isAll() || isMulti();
+    var lastMonth = null;
     var html = games.map(function (g, i) {
       var f = g.fixture;
       var canCal = f.date && f.time;
-      var timeLabel = f.time ? fmtTime(f.time) : (f.rawTime && f.rawTime.toUpperCase() === 'TBC' ? 'Time TBC' : 'Time TBC');
+      var timeLabel = f.time ? fmtTime(f.time) : 'Time TBC';
       var venue = (f.location && f.location.toUpperCase() !== 'TBC') ? f.location : 'Venue TBC';
       var mates = matesFor(f);
       var otherMates = mates.filter(function (mm) { return mm.team !== g.team; });
-      return '' +
+      // #4 — a month divider whenever the month changes down the sorted list.
+      var head = '';
+      var key = monthKey(f.date);
+      if (key !== lastMonth) { head = '<div class="month-head">' + escapeHtml(monthLabel(f.date)) + '</div>'; lastMonth = key; }
+      return head +
         '<article class="game-card status-' + g.info.status + '">' +
           '<div class="game-date">' +
             '<span class="gd-dow">' + (f.date ? DAYS[f.date.getDay()] : '') + '</span>' +
@@ -393,11 +523,36 @@
     reader.readAsArrayBuffer(file);
   }
 
-  // Default selection: the remembered team if still present, else "All teams".
-  function defaultSelection() {
-    var stored = localStorage.getItem(TEAM_KEY);
-    if (stored && stored !== ALL_TEAMS && FuryFixtures.findTeam(model(), stored)) return stored;
-    return ALL_TEAMS;
+  // Default selection: the remembered team(s) if still present, else "All teams".
+  function applyDefaultSelection() {
+    var stored = loadSelection();
+    if (stored.mode === 'teams') {
+      var valid = stored.ids.filter(function (id) { return FuryFixtures.findTeam(model(), id); });
+      state.selection = valid.length ? { mode: 'teams', ids: orderIds(valid) } : { mode: 'all', ids: [] };
+    } else {
+      state.selection = { mode: 'all', ids: [] };
+    }
+  }
+
+  // Deep link: #team=U16W or #team=U16W,SMD1 (or #team=all) preselects teams.
+  // Runs after data is loaded and overrides the remembered selection.
+  function applyTeamHash(rawHash) {
+    var m = (rawHash || '').match(/[#&]team=([A-Za-z0-9,]+)/i);
+    if (!m) return;
+    var val = m[1];
+    if (/^all$/i.test(val)) {
+      state.selection = { mode: 'all', ids: [] };
+    } else {
+      var ids = [];
+      val.split(',').forEach(function (w) {
+        state.teams.forEach(function (t) {
+          if (t.id.toLowerCase() === w.toLowerCase() && ids.indexOf(t.id) === -1) ids.push(t.id);
+        });
+      });
+      if (ids.length) state.selection = { mode: 'teams', ids: orderIds(ids) };
+    }
+    saveSelection();
+    try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
   }
 
   // ============================================================
@@ -479,14 +634,20 @@
   function strToB64url(str) { return bytesToB64url(new TextEncoder().encode(str)); }
   function b64urlToStr(s) { return new TextDecoder().decode(b64urlToBytes(s)); }
 
+  // Append the current team selection so a shared link opens on the same view.
+  function selectionSuffix() {
+    return '&team=' + (isAll() ? 'all' : selectedIds().join(','));
+  }
+
   function buildShareLink() {
     var json = FuryShare.serialize(model());
     var base = location.origin + location.pathname;
+    var tail = selectionSuffix();
     if (window.CompressionStream) {
-      return gzip(json).then(function (gz) { return base + '#d=g' + bytesToB64url(gz); })
-        .catch(function () { return base + '#d=r' + strToB64url(json); });
+      return gzip(json).then(function (gz) { return base + '#d=g' + bytesToB64url(gz) + tail; })
+        .catch(function () { return base + '#d=r' + strToB64url(json) + tail; });
     }
-    return Promise.resolve(base + '#d=r' + strToB64url(json));
+    return Promise.resolve(base + '#d=r' + strToB64url(json) + tail);
   }
 
   function doShareLink() {
@@ -504,8 +665,9 @@
   }
 
   function doShareText() {
+    var tagTeams = isAll() || isMulti();
     var games = currentGames().map(function (g) {
-      return { fixture: g.fixture, info: g.info, teamLabel: isAll() ? FuryFixtures.teamLabel(g.team) : '' };
+      return { fixture: g.fixture, info: g.info, teamLabel: tagTeams ? FuryFixtures.teamLabel(g.team) : '' };
     });
     var text = FuryShare.fixturesToText(games, headingLabel());
     if (navigator.share) {
@@ -637,12 +799,16 @@
     Array.prototype.forEach.call(el.filterChips.querySelectorAll('.chip'), function (btn) {
       btn.classList.toggle('active', !!state.filters[btn.getAttribute('data-filter')]);
     });
+    // Capture the hash before loadFromHash clears any #d= share payload.
+    var rawHash = location.hash;
     // Priority: a shared link, then saved data, then the bundled season.
     loadFromHash().then(function (fromLink) {
       if (fromLink) return;
       if (load()) return;
       return loadBundled();
     }).then(function () {
+      applyDefaultSelection();   // remembered team(s), or "all"
+      applyTeamHash(rawHash);    // #team=… deep link overrides
       render();
     });
   }

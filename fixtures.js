@@ -71,6 +71,22 @@
     return games;
   }
 
+  // Games for a set of teams, merged and sorted by date (the "favourites" view).
+  function teamsGames(model, ids, filters, today) {
+    var set = {};
+    (ids || []).forEach(function (id) { set[id] = true; });
+    var games = [];
+    model.teams.forEach(function (t) {
+      if (!set[t.id]) return;
+      t.fixtures.forEach(function (f) {
+        if (!passesFilters(f, filters, today)) return;
+        games.push({ team: t.id, fixture: f, info: homeAwayInfo(f) });
+      });
+    });
+    games.sort(byDate);
+    return games;
+  }
+
   // Every fixture across every team, for the "all teams" view.
   function allFixtureGames(model, filters, today) {
     var games = [];
@@ -122,6 +138,7 @@
     homeAwayInfo: homeAwayInfo,
     findTeam: findTeam,
     teamGames: teamGames,
+    teamsGames: teamsGames,
     allFixtureGames: allFixtureGames,
     teams: teams,
     sameDayTeams: sameDayTeams,

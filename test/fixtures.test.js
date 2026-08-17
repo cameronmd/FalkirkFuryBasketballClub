@@ -88,6 +88,34 @@ test('teamGames: unknown team yields no games', () => {
   assert.deepEqual(F.teamGames(makeModel(), 'Ghost', {}, null), []);
 });
 
+test('teamsGames merges a chosen set of teams, tagged and date-sorted', () => {
+  const m = makeModel();
+  const games = F.teamsGames(m, ['U16W', 'SMD1'], {}, null);
+  // U16W has 3, SMD1 has 2 => 5 total, merged and sorted by date.
+  assert.equal(games.length, 5);
+  assert.equal(games[0].fixture.date.getDate(), 5); // earliest is Sep 5
+  assert.ok(games.every(g => ['U16W', 'SMD1'].indexOf(g.team) !== -1));
+  const times = games.map(g => g.fixture.date.getTime());
+  assert.deepEqual(times, times.slice().sort((a, b) => a - b)); // non-decreasing
+  assert.ok(games.some(g => g.team === 'SMD1') && games.some(g => g.team === 'U16W'));
+});
+
+test('teamsGames with one id matches teamGames; unknown ids are ignored', () => {
+  const m = makeModel();
+  assert.deepEqual(
+    F.teamsGames(m, ['U16W'], {}, null).map(g => g.fixture.round),
+    F.teamGames(m, 'U16W', {}, null).map(g => g.fixture.round)
+  );
+  assert.deepEqual(F.teamsGames(m, ['ghost'], {}, null), []);
+  assert.deepEqual(F.teamsGames(m, [], {}, null), []);
+});
+
+test('teamsGames respects home/away + hidepast filters', () => {
+  const m = makeModel();
+  const homeOnly = F.teamsGames(m, ['U16W', 'SMD1'], { home: true, away: false }, null);
+  assert.ok(homeOnly.every(g => g.fixture.isHome));
+});
+
 test('allFixtureGames merges every team, tags team id, sorts by date', () => {
   const games = F.allFixtureGames(makeModel(), {}, null);
   assert.equal(games.length, 5);

@@ -28,8 +28,8 @@ No more scrolling across eight spreadsheet tabs to find when and where your team
 ## What it does
 
 1. **Opens with this season's fixtures already loaded** — the bundled schedule appears straight away, no upload needed.
-2. **Pick your team** — U14 Boys, U16 Girls, Senior Men, and so on.
-3. **See the games** as clean cards, sorted by date: opponent, home/away, time, venue and round.
+2. **Pick your team(s)** — U14 Boys, U16 Girls, Senior Men, and so on; select several at once (great for families with kids in different age groups), or view every team.
+3. **See the games** as clean cards, grouped by month and sorted by date: opponent, home/away, time, venue and round.
 4. **Add to your calendar** — a single game, or all of them at once, as a standard `.ics` file. On iPhone this opens Apple Calendar with an "Add All" prompt. Each event uses the fixture's own venue, gets a reminder before tip-off, and a 2-hour block.
 
 ### Nice extras
@@ -37,10 +37,12 @@ No more scrolling across eight spreadsheet tabs to find when and where your team
 - **Works offline & installable (PWA).** After the first visit it runs with no connection, and can be added to your home screen as an app.
 - **Runs entirely in your browser.** Nothing is uploaded anywhere.
 - **Home / away at a glance** — every card is colour-coded and each calendar event carries the real venue with a tappable Google Maps link.
-- **View everyone** — opens on _All teams — every fixture_ (the whole club schedule) by default; pick a team to narrow it.
+- **View everyone** — opens on _All teams — every fixture_ (the whole club schedule) by default; pick one or more teams to narrow it.
+- **This weekend spotlight** — in the all-teams / multi-team views, the upcoming Saturday–Sunday Fury games are pulled out at the top so you can see the weekend at a glance.
+- **Month dividers** — the list is grouped under sticky _September 2026_, _October 2026_… headers so a long season stays scannable.
 - **Filter** — show/hide **home** or **away** games, and hide games that have already passed.
 - **Also playing today** — tap any game to see which other Fury teams are out on the same day (yours is highlighted) — handy for car-sharing and clashes.
-- **Share** — send the whole season as a link (others open it ready to go, no spreadsheet needed), or share the fixtures on screen as text.
+- **Share** — send the whole season as a link (it even remembers which team(s) you were viewing, via a `#team=…` deep link), or share the fixtures on screen as text. Coaches can link straight to a team, e.g. `…/#team=U16W` or `…/#team=U16W,SMD1`.
 - **Upload a new spreadsheet** — when a fresh season sheet lands, tap **Change file** to load it; it replaces the bundled data on your device.
 - **Remembers** your chosen team and any uploaded/shared fixtures, so next time you just open it.
 - **Next game** shown at a glance.
